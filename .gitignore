@@ -1,0 +1,15 @@
+# Ignore everything by default
+*
+
+# Track the ignore file itself
+!.gitignore
+
+# Track only the Scripts folder's V1 embryo notebooks
+!Scripts/
+Scripts/*
+!Scripts/Image_Segmentation_Embryo_MetaData(V1).ipynb
+!Scripts/Image_Segmentation_Embryo_MetaData_95th(V1).ipynb
+!Scripts/Image_Segmentation_Embryo_MetaData_99th(V1).ipynb
+
+# Jupyter housekeeping (in case I open these notebooks later)
+.ipynb_checkpoints/
