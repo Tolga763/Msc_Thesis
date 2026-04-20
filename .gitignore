@@ -10,6 +10,8 @@ Scripts/*
 !Scripts/Image_Segmentation_Embryo_MetaData(V1).ipynb
 !Scripts/Image_Segmentation_Embryo_MetaData_95th(V1).ipynb
 !Scripts/Image_Segmentation_Embryo_MetaData_99th(V1).ipynb
+!Scripts/Image_Segmentation_Embryo_UMAP(V1).ipynb
+!Scripts/Image_Segmentation_Embryo_tSNE(V1).ipynb
 
 # Jupyter housekeeping (in case I open these notebooks later)
 .ipynb_checkpoints/
