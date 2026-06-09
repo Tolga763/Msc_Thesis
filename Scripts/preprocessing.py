@@ -36,7 +36,7 @@ from skimage.morphology import (
     square,                 # defines the 3x3 structuring element used in BED
 )
 import tifffile  # reads OME-TIFF files produced by the LA-ICP-MS instrument
-
+ 
 import config    # all settings and parameters live in config.py, we are importing it here
  
  
@@ -49,14 +49,14 @@ def load_image(file_path: str):
     OME-TIFF is the file format produced by the LA-ICP-MS instrument.
     It stores a 3D array of shape (n_channels, height, width) where each
     channel is a 2D elemental map (e.g. one image for Fe, one for Zn, etc.)
-
-    So loading an OME-TIFF file and extracts two things: 
+ 
+    So loading an OME-TIFF file and extracts two things:
     1.) The actual pixel data: a 3D array of shape (n_channels, height, width)
     2.) The channel names: a list of strings, one per channel
-
+ 
     The channel names are stored in XML metadata embedded inside the TIFF file.
     This function reads that XML and pulls out the names automatically, so you
-    don't have to hardcode the names, making this method highly reproducible 
+    don't have to hardcode the names, making this method highly reproducible
     and aplicable to any dataset.
  
     Returns:
@@ -115,20 +115,23 @@ def filter_channels(img_raw: np.ndarray, all_channel_names: list):
         channel_names_filtered: names after all exclusions
         qupath_colours       : list of colour strings for each kept channel
     """
-    # Step 1: Always remove channel at index 0 (0TIC — total ion count, not a real element)
-    drop_indices = [i for i, 
-                    name in enumerate(all_channel_names) 
+    # Step 1: Remove channels listed in config.CHANNELS_TO_DROP (e.g. 0TIC)
+    # We look up by name rather than hardcoding index 0, because 0TIC may not
+    # always be the first channel in every dataset.
+    drop_indices = [i for i, name in enumerate(all_channel_names)
                     if name in config.CHANNELS_TO_DROP]
-    
+ 
     # The img line takes raw 3D image array (n_channels, H, W) and removes the channels at drop_indices
-    # axis=0 means "remove the channel dimension", not the height or width. 
-    # So if 0TIC was channel 0, the result is a new array with shape (n_channels-1, H, W) where the 0TIC channel has been removed.
-    img = np.delete(img_raw, drop_indices, axis=0) 
-
+    # axis=0 means "remove the channel dimension", not the height or width.
+    # So if 0TIC was channel 0, the result is a new array with shape (n_channels-1, H, W)
+    # where the 0TIC channel has been removed.
+    img = np.delete(img_raw, drop_indices, axis=0)
+ 
     # Does the same thing but for the names list
     # Keeps only the names of channels whose index is NOT in drop_indices
     # So the names list stays in sync with the image array after dropping 0TIC
-    # If you didn't do this, channel 0 in the image would no longer match channel 0 in the names list, causing confusion later on.
+    # If you didn't do this, channel 0 in the image would no longer match channel 0
+    # in the names list, causing confusion later on.
     channel_names = [name for i, name in enumerate(all_channel_names) if i not in drop_indices]
  
     # Step 2: Apply any manual exclusions defined in config.CHANNELS_MANUAL_EXCLUDE
@@ -159,7 +162,7 @@ def filter_channels(img_raw: np.ndarray, all_channel_names: list):
  
 def load_metadata(metadata_path: str, channel_names_filtered: list):
     """
-    Loads the metadata CSV exported from the LA-ICP-MS Balrog script 
+    Loads the metadata CSV exported from the LA-ICP-MS Balrog script.
     The metadata builds a lookup dictionary of (min, max) display ranges per channel.
  
     The metadata CSV contains three key rows:
@@ -174,8 +177,8 @@ def load_metadata(metadata_path: str, channel_names_filtered: list):
     meta_df = pd.read_csv(metadata_path, index_col=0)
  
     # The CSV stores these as string-encoded Python lists — ast.literal_eval converts them back
-    all_min_thresholds    = ast.literal_eval(meta_df.loc['min thresholds', '0'])
-    all_max_thresholds    = ast.literal_eval(meta_df.loc['max thresholds', '0'])
+    all_min_thresholds     = ast.literal_eval(meta_df.loc['min thresholds', '0'])
+    all_max_thresholds     = ast.literal_eval(meta_df.loc['max thresholds', '0'])
     all_channel_names_meta = ast.literal_eval(meta_df.loc['processed isotopes', '0'])
  
     # Build lookup dict mapping full isotope names to their display ranges
@@ -187,15 +190,24 @@ def load_metadata(metadata_path: str, channel_names_filtered: list):
         for i, name in enumerate(all_channel_names_meta)
     }
  
-    # Build a list of (min, max) ranges aligned to our filtered channel list
-    # If a channel name can't be found in metadata, use (0, 1) as a safe fallback
+    # Build a list of (min, max) ranges aligned to our filtered channel list.
+    # Try exact match first (e.g. CSV and OME-TIFF both use '56Fe').
+    # If no exact match, try fuzzy match by stripping leading digits from the CSV key
+    # e.g. '23Na' → 'Na', '56Fe' → 'Fe' to match short names from the OME-TIFF metadata.
+    # This handles datasets where the OME-TIFF uses short names and the CSV uses full isotope notation.
+    # If a channel name can't be found in metadata, use (0, 1) as a safe fallback.
     channel_ranges = []
     for name in channel_names_filtered:
         if name in threshold_lookup:
             channel_ranges.append(threshold_lookup[name])
         else:
-            print(f"Warning: '{name}' not found in metadata — using (0, 1) as fallback.")
-            channel_ranges.append((0, 1))
+            match = next((v for k, v in threshold_lookup.items()
+                          if k.lstrip('0123456789') == name), None)
+            if match:
+                channel_ranges.append(match)
+            else:
+                print(f"Warning: '{name}' not found in metadata — using (0, 1) as fallback.")
+                channel_ranges.append((0, 1))
  
     print("\nThreshold lookup built:")
     for name, (mn, mx) in threshold_lookup.items():
@@ -203,22 +215,23 @@ def load_metadata(metadata_path: str, channel_names_filtered: list):
  
     return threshold_lookup, channel_ranges
  
-
+ 
 # =============================================================================
 # 4. TISSUE MASKING
 # =============================================================================
-
+ 
 def percentile_95_excluding_zeros(image: np.ndarray) -> float:
     """
     Returns the 95th percentile brightness of non-zero, finite pixels.
     Used to set a sensible display maximum for the mask preview plot,
     so that a few very bright hotspot pixels don't wash out the image.
     Zero pixels are excluded because they represent true background/no signal.
-
+ 
     NOTE: This function only affects the display ranges of the preview plots.
     It does NOT affect the actual masking threshold or the pixel values used in PCA/UMAP/tSNE. Data stays same.
-    The masking threshold is set separately in the config file and applied in the threshold_SOR_fill_BED function. 
-    This function is purely for visualisation purposes to help you choose a good threshold value by showing a preview of the mask with a reasonable colour range.
+    The masking threshold is set separately in the config file and applied in the threshold_SOR_fill_BED function.
+    This function is purely for visualisation purposes to help you choose a good threshold value
+    by showing a preview of the mask with a reasonable colour range.
     """
     valid = np.isfinite(image) & (image > 0)
     if not np.any(valid):
@@ -236,8 +249,9 @@ def threshold_SOR_fill_BED(
     connectivity: int = 2,
 ):
     """
-    This is the core masking function. 
-    It takes one elements 2D image and turns it into a binary mask (1 = tissue, 0 = background) through a series of 4 steps:
+    This is the core masking function.
+    It takes one elements 2D image and turns it into a binary mask (1 = tissue, 0 = background)
+    through a series of 4 steps:
  
     Step 1 — THRESHOLD:
         Keep all pixels with intensity >= threshold.
@@ -319,7 +333,8 @@ def apply_mask(
     output_dir: str             = None,
 ):
     """
-    This is where the mask actually gets applied to the full image and builds the pixel dataframe (df) and tissue_indices_final.
+    This is where the mask actually gets applied to the full image and builds
+    the pixel dataframe (df) and tissue_indices_final.
  
     This function:
       1. Runs threshold_SOR_fill_BED on a chosen channel to create the binary mask
