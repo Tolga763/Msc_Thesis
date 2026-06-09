@@ -8,14 +8,13 @@
 #     1. Preprocessing  — load OME-TIFF, mask tissue, log1p normalise
 #     2. PCA            — loading plots to understand elemental variation
 #     3. UMAP           — 3D embedding and RGB spatial map (primary output)
-#     4. tSNE           — comparison embedding (subsampled, mainly thesis only)
+#     4. tSNE           — comparison embedding (subsampled, thesis only)
 #     5. Clustering     — K-means elbow + HDBSCAN sweep on UMAP coordinates
 #
 # HOW TO RUN:
 #   From the terminal (inside the pipeline/Scripts folder or with it on PATH):
 #
 #     python main.py --input /path/to/image.ome.tiff --output /path/to/results
-#    For example, ""
 #
 #   Optional flags:
 #     --skip-pca       skip PCA step
@@ -27,13 +26,13 @@
 # OUTPUT STRUCTURE:
 #   results/
 #   ├── preprocessing/   (channel maps, mask visualisation)
-#   ├── pca/             (scree plot, loading matrix, PCA RGB map)
+#   ├── pca/             (scree, loading matrix, PCA RGB map)
 #   ├── umap/            (RGB spatial map, channel coloured plots, 3D scatter)
 #   ├── tsne/            (RGB spatial map, channel coloured plots)
 #   └── clustering/      (K-means elbow, HDBSCAN sweep, spatial label maps)
 #
 # NOTES:
-#   - All parameters are controlled via config.py, do not hardcode values here.
+#   - All parameters are controlled via config.py — do not hardcode values here.
 #   - HDBSCAN and K-means parameters in config.py are PLACEHOLDERS until you
 #     have run the sweep on your actual RCC dataset and chosen final values.
 # =============================================================================
@@ -104,6 +103,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="Skip the PCA step entirely.",
+    )
+    parser.add_argument(
+        "--skip-umap",
+        action="store_true",
+        default=False,
+        help="Skip the UMAP step.",
     )
     parser.add_argument(
         "--skip-tsne",
@@ -279,17 +284,21 @@ def run_pipeline(args: argparse.Namespace) -> None:
     # ------------------------------------------------------------------
  
     umap_dir = visualisation.make_output_dir(args.output, "umap")
+    umap_result = None
  
-    umap_result = run_stage(
-        "UMAP",
-        _run_umap,
-        df_normalised=df_normalised,
-        tissue_indices_final=tissue_indices_final,
-        height=height,
-        width=width,
-        scale_suggestions=scale_suggestions,
-        out_dir=umap_dir,
-    )
+    if not args.skip_umap:
+        umap_result = run_stage(
+            "UMAP",
+            _run_umap,
+            df_normalised=df_normalised,
+            tissue_indices_final=tissue_indices_final,
+            height=height,
+            width=width,
+            scale_suggestions=scale_suggestions,
+            out_dir=umap_dir,
+        )
+    else:
+        print("\n  [skipped] UMAP (--skip-umap flag set)")
  
     if umap_result is None:
         print("\n  WARNING: UMAP failed — clustering step will be skipped.\n")
@@ -455,7 +464,7 @@ def _run_pca(
     Returns (X_pca, pca_object)
     """
     # Fit PCA; returns (X_pca, pca_object, explained_variance_ratio)
-    X_pca, pca_obj, evr = pca_analysis.run_pca(df_normalised)
+    pca_obj, X_pca = pca_analysis.run_pca(df_normalised)
  
     pca_analysis.plot_scree(evr, out_dir=out_dir)
     pca_analysis.plot_cumulative_variance(evr, out_dir=out_dir)
