@@ -466,18 +466,17 @@ def _run_pca(
     # Fit PCA; returns (X_pca, pca_object, explained_variance_ratio)
     pca_obj, X_pca = pca_analysis.run_pca(df_normalised)
  
-    pca_analysis.plot_scree(evr, out_dir=out_dir)
-    pca_analysis.plot_cumulative_variance(evr, out_dir=out_dir)
-    pca_analysis.plot_covariance_matrix(df_normalised, out_dir=out_dir)
-    pca_analysis.plot_loading_matrix(pca_obj, df_normalised.columns.tolist(), out_dir=out_dir)
-    pca_analysis.plot_loading_2d(pca_obj, df_normalised.columns.tolist(), out_dir=out_dir)
+    pca_analysis.plot_scree(pca_obj, output_dir=out_dir)
+    pca_analysis.plot_cumulative_variance(pca_obj, output_dir=out_dir)
+    pca_analysis.plot_covariance_matrix(df_normalised, df_normalised.columns.tolist(), output_dir=out_dir)
+    pca_analysis.plot_loading_matrix(pca_obj, df_normalised.columns.tolist(), output_dir=out_dir)
+    pca_analysis.plot_loading_2d(pca_obj, df_normalised.columns.tolist(), output_dir=out_dir)
     pca_analysis.plot_pca_rgb(
         X_pca, tissue_indices_final, height, width, out_dir=out_dir
     )
  
     return X_pca, pca_obj
- 
- 
+
 def _run_umap(
     df_normalised, tissue_indices_final, height, width, scale_suggestions, out_dir
 ):
