@@ -472,7 +472,7 @@ def _run_pca(
     pca_analysis.plot_loading_matrix(pca_obj, df_normalised.columns.tolist(), output_dir=out_dir)
     pca_analysis.plot_loading_2d(pca_obj, df_normalised.columns.tolist(), output_dir=out_dir)
     pca_analysis.plot_pca_rgb(
-        X_pca, tissue_indices_final, height, width, out_dir=out_dir
+        X_pca, tissue_indices_final, height, width, output_dir=out_dir
     )
  
     return X_pca, pca_obj
