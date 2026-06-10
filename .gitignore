@@ -1,17 +1,16 @@
-# Ignore everything by default
-*
+# Ignore large data and output files
+Data/
+Results/
+Outputs/
 
-# Track the ignore file itself
-!.gitignore
+# Ignore Python cache
+__pycache__/
+*.pyc
 
-# Track only the Scripts folder's V1 embryo notebooks
-!Scripts/
-Scripts/*
-!Scripts/Image_Segmentation_Embryo_MetaData(V1).ipynb
-!Scripts/Image_Segmentation_Embryo_MetaData_95th(V1).ipynb
-!Scripts/Image_Segmentation_Embryo_MetaData_99th(V1).ipynb
-!Scripts/Image_Segmentation_Embryo_UMAP(V1).ipynb
-!Scripts/Image_Segmentation_Embryo_tSNE(V1).ipynb
-
-# Jupyter housekeeping (in case I open these notebooks later)
+# Ignore Jupyter checkpoints
 .ipynb_checkpoints/
+
+# Ignore Mac system files
+.DS_Store
+
+# Track everything in Scripts/ and notebooks/
